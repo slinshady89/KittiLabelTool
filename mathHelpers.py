@@ -1,6 +1,13 @@
 import numpy as np
 import math
 
+# twitchslam: https://github.com/geohot/twitchslam/blob/master/helpers.py
+def add_ones(x):
+  if len(x.shape) == 1:
+    return np.concatenate([x,np.array([1.0])], axis=0)
+  else:
+    return np.concatenate([x, np.ones((x.shape[0], 1))], axis=1)
+
 
 # https://computergraphics.stackexchange.com/a/8229
 def euler_to_quaternion_rad(roll, pitch, yaw):
