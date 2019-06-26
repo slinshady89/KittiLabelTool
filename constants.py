@@ -6,72 +6,60 @@ class Constants():
     def __init__(self):
 
         ## quaternion rotation of coordinate system from world to camera system
-        self.quats =[0.499, -0.499, 0.501, 0.501]
+        self.quats =[-0.5, 0.5, -0.5, 0.5]
 
-        ## quaternion rotation of coordinate system from world to camera system
-        ## quaternion rotation of coordinate system from world to camera system
-        #self.quats =[-0.5, 0.5, -0.5, 0.5]
-
-        self.theta = np.array(quaternion_to_euler_rad(self.quats),dtype=np.float32).reshape(3,1)
+        self.theta = np.array(quaternion_to_euler_rad(self.quats), dtype=np.float32).reshape(3,1)
 
         ## camera intrinsics matrix
         #     [fx'  0  cx']
         # K = [ 0  fy' cy']
         #     [ 0   0   1 ]
-        self.K = np.array([335.639852470912, 0.0, 400.0, 0.0, 335.639852470912, 300.0, 0.0, 0.0, 1.0],dtype=np.float32).reshape(3,3)
+        self.K = np.array([718.856, 0.0, 607.1928, 0.0, 718.856, 185.2157, 0.0, 0.0, 1.0], dtype=np.float32).reshape(3,3)
 
         self.R = eulerAnglesToRotationMatrixRad(self.theta)
-        print(self.R)
 
-        ## Translation from lidar to camera coordinate system
-        self.T = np.array([-0.02, -0.4,-2],dtype=np.float32).reshape(3,1)
-        ## Translation for world-coord to camera
-        #self.T = np.array([2.0, -0.4, 2.0],dtype=np.float32).reshape(3,1)
+        ## Translation from left & right wheel to camera
+        self.T_left = np.array([-0.8, 1.65, 1.65], dtype=np.float32).reshape(3,1)
+        self.T_right = np.array([0.8, 1.65, 1.65], dtype=np.float32).reshape(3,1)
 
-        self.RT = np.column_stack((self.R,self.T))
-        self.KRT = np.matmul(self.K, self.RT)
+        ## Transformationmatrices from left & right wheel to camera
+        self.RT_left = np.column_stack((self.R,self.T_left))
+        self.RT_right = np.column_stack((self.R,self.T_right))
+
+        ## Projection matrices from left & right wheel to image coordinates
+        self.KRT_left = np.matmul(self.K, self.RT_left)
+        self.KRT_right = np.matmul(self.K, self.RT_right)
+
+        print("Projection Matrices: \n")
+        print("Left: \n")
+        print(self.KRT_left)
+        print("\nRight: \n")
+        print(self.KRT_right)
+        print("\n")
 
         ## projection matrix
         #     [fx'  0  cx' Tx]
         # P = [ 0  fy' cy' Ty]
         #     [ 0   0   1   0]
-        self.P = np.float32([335.639852470912, 0.0, 400.0, 0.0, 0.0, 335.639852470912, 300.0, 0.0, 0.0, 0.0, 1.0, 0.0]).reshape(3, 4)
-
-        if os.path.exists('/home/localadmin/nils/imageseries/1/capture/'):
-            self.img_path = '/home/localadmin/nils/imageseries/1/capture/'  # '/home/nils/nils/imageseries/1/capture/'
-            self.label_path = '/home/localadmin/nils/imageseries/1/labels_backwards/'  # '/home/nils/nils/imageseries/1/labels/'
-        else:
-            self.img_path =  '/home/nils/nils/imageseries/1/capture/'
-            self.label_path =  '/home/nils/nils/imageseries/1/labels/'
-
+        self.P = np.float32([7.188560000000e+02, 0.000000000000e+00, 6.071928000000e+02, 0.000000000000e+00,
+                             0.000000000000e+00, 7.188560000000e+02, 1.852157000000e+02, 0.000000000000e+00,
+                             0.000000000000e+00, 0.000000000000e+00, 1.000000000000e+00, 0.000000000000e+00]).reshape(3, 4)
 
         self.image_names = []
-        self.pcl_names = []
+        self.poses = []
+        self.image_path = []
 
 
-    def readFileLists(self):
-        list_of_files = os.listdir(self.img_path)
-        pattern_png = "*.png"
 
+    def readFileLists(self, img_path, sequence):
+        self.image_path = img_path + "sequences/" + sequence + "/image_0/"
+        list_of_files = os.listdir(self.image_path)
+        for image_name in list_of_files:
+            self.image_names.append(image_name)
 
-        image_chunk = []
-        pcl_chunk = []
-        pose_names = []
+        self.image_names.sort()
+        self.poses = np.loadtxt(img_path + "poses/" + sequence + ".txt")
 
-        ## find all images in the folder with corresponding point clouds and
-        for entry in list_of_files:
-            if fnmatch.fnmatch(entry, pattern_png):
-                corresponding_pcl = entry.replace('.png', '.pcd')
-                if corresponding_pcl in list_of_files:
-                    pcl_chunk.append(corresponding_pcl)
-                else:
-                    continue
-                image_chunk.append(entry)
-
-        self.pcl_names = pcl_chunk.sort()
-        self.image_names = image_chunk.sort()
-
-        return pcl_chunk, image_chunk
 
     # TODO: make this working
     def getImageName(self, idx):
