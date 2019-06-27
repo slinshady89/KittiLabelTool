@@ -24,7 +24,7 @@ pose_tf = np.eye(4, dtype = np.float)
 
 i = 0
 j = 0
-k = 250
+k = 10
 while i < len(consts.image_names) - 1:
     image = cv2.imread(consts.image_path + consts.image_names[i])
     j = i
@@ -38,8 +38,9 @@ while i < len(consts.image_names) - 1:
         if j > len(consts.image_names):
             break
         pose_chunk[:3, :4] = np.array(consts.poses[j]).reshape(3, 4)
-        last_pose = np.linalg.inv(pose_chunk)
         pose_chunk = np.matmul(last_pose, pose_chunk)
+        last_pose = np.linalg.inv(pose_chunk)
+
         #print("pose_chunk \n")
         #print(pose_chunk)
         #pose_tf = np.matmul(pose_tf, pose_chunk)
