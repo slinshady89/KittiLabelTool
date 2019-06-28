@@ -17,13 +17,14 @@ class Constants():
         self.K = np.array([718.856, 0.0, 607.1928,
                            0.0, 718.856, 185.2157,
                            0.0, 0.0, 1.0], dtype = np.float32).reshape(3, 3)
+        self.K_inv = np.linalg.inv(self.K)
 
         #self.R = eulerAnglesToRotationMatrixRad(self.theta)
         self.R = np.eye(3, dtype = np.float)
 
         ## Translation from left & right wheel to camera
-        self.T_left = np.array([0.8, 1.65, 1.68], dtype = np.float32).reshape(3, 1)
-        self.T_right = np.array([-0.8, 1.65, 1.68], dtype = np.float32).reshape(3, 1)
+        self.T_left = np.array([-0.8, 1.65, 1.68], dtype = np.float32).reshape(3, 1)
+        self.T_right = np.array([0.8, 1.65, 1.68], dtype = np.float32).reshape(3, 1)
 
         ## Transformationmatrices from left & right wheel to camera
         self.RT_left = np.column_stack((self.R, self.T_left))
@@ -33,7 +34,10 @@ class Constants():
 
         ## Projection matrices from left & right wheel to image coordinates
         self.KRT_left = np.matmul(self.K, self.RT_left)
+        self.K_inv_RT_left = np.matmul(self.K_inv, self.RT_left)
         self.KRT_right = np.matmul(self.K, self.RT_right)
+        self.K_inv_RT_right = np.matmul(self.K_inv, self.RT_right)
+
 
         print("Projection Matrices: \n")
         print("Left: \n")
