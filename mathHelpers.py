@@ -8,6 +8,8 @@ def add_ones(x):
   else:
     return np.concatenate([x, np.ones((x.shape[0], 1))], axis=1)
 
+def pt_in_image(pt, width, height):
+    return pt[0] > 0 and pt[1] > 0 #'and pt[0] < width and pt[1] < height'
 
 # https://computergraphics.stackexchange.com/a/8229
 def euler_to_quaternion_rad(roll, pitch, yaw):
