@@ -62,7 +62,8 @@ print("\nimage shape: \n")
 height, width, channels = image.shape
 print(image.shape)
 
-pt = np.array((-.27, 0.0, 0.0), dtype = np.float).reshape(3, 1)
+# point of IMU
+pt = np.array((-.27 - 0.81, -.32, 0.93), dtype = np.float).reshape(3, 1)
 pose_tf = np.eye(4, dtype = np.float)
 
 consts.readTfLidarToCamera0(kitti_dir, sequence)
