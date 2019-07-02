@@ -1,4 +1,6 @@
 import numpy as np
+from pykitti.utils import read_calib_file
+
 from mathHelpers import isRotationMatrix, euler_to_quaternion_rad, eulerAnglesToRotationMatrixRad, quaternion_to_euler_rad, add_ones
 import os, fnmatch
 
@@ -23,8 +25,8 @@ class Constants():
         self.R = np.eye(3, dtype = np.float)
 
         ## Translation from left & right wheel to camera
-        self.T_left = np.array([-0.8, 1.65, 1.68], dtype = np.float32).reshape(3, 1)
-        self.T_right = np.array([0.8, 1.65, 1.68], dtype = np.float32).reshape(3, 1)
+        self.T_left = np.array([-0.8, 1.68, 1.65], dtype = np.float32).reshape(3, 1)
+        self.T_right = np.array([0.8, 1.68, 1.65], dtype = np.float32).reshape(3, 1)
 
         ## Transformationmatrices from left & right wheel to camera
         self.RT_left = np.column_stack((self.R, self.T_left))
@@ -57,6 +59,7 @@ class Constants():
         self.image_names = []
         self.poses = []
         self.image_path = []
+        self.Tr_lidar = []
 
     def readFileLists(self, img_path, sequence):
         self.image_path = img_path + "sequences/" + sequence + "/image_0/"
@@ -69,3 +72,9 @@ class Constants():
     def getImageName(self, idx):
         return self.image_path + self.image_names[idx]
 
+
+    def readTfLidarToCamera0(self, img_path, sequence):
+        chunk = read_calib_file(img_path + "sequences/" + sequence + "/calib.txt")
+        self.Tr_lidar = chunk['Tr'].reshape(3,4)
+        self.P_L2C = np.matmul(self.K, self.Tr_lidar)
+        print(self.P_L2C)
