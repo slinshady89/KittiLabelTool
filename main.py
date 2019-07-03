@@ -7,7 +7,7 @@ import transformations as tf
 
 #kitti_dir = '/home/nils/nils/kitti/data_odometry_gray/dataset/'
 kitti_dir = '/media/localadmin/New Volume/11Nils/kitti/dataset/'
-sequence = '00'
+sequence = '10'
 #velo_dir = '/home/nils/nils/kitti/dataset/sequences/'
 velo_dir = '/media/localadmin/New Volume/11Nils/kitti/dataset/sequences/'
 
@@ -24,31 +24,41 @@ def processPointCloud(img, pointcloud, pitch):
     mean_z = 0
     height, width, channels = img.shape
     processedImg = np.zeros((height, width, 3), np.uint8)
-    print(len(pointcloud))
+    object_line_for_clomumn = np.zeros((width, 1), np.uint8)
     while i < len(pointcloud):
         # check if the x coordinate is in front of the camera at all
-        if pointcloud[i][0] > 2:
+        if pointcloud[i][0] > 0:
             # check if it's roughly in front of the camera
-            if np.abs(pointcloud[i][1]) < 15:
-                #test = np.array([pc_data[i][0], pc_data[i][1], pc_data[i][2], 1]).reshape(4,1)
-                pts = np.matmul(consts.P_L2C, np.array([pointcloud[i][0], pointcloud[i][1], pointcloud[i][2],1]).reshape(4,1))
-                #  [u v w]' = P * [X Y Z 1]'
-                if pts[2] != 0:
+            if np.abs(pointcloud[i][1]) < 25:
+                if 0.25 < pointcloud[i][2] + 1.73:
+                    #test = np.array([pc_data[i][0], pc_data[i][1], pc_data[i][2], 1]).reshape(4,1)
+                    pts = np.matmul(consts.P_L2C, np.array([pointcloud[i][0], pointcloud[i][1], pointcloud[i][2],1]).reshape(4,1))
+                    #  [u v w]' = P * [X Y Z 1]'
+                    if pts[2] != 0:
 
-                    #         x = u / w
-                    #         y = v / w
-                    u = int(np.divide(pts[0], pts[2]))
-                    v = int(np.divide(pts[1], pts[2]))
-                    # TODO: recover groundplane from the point cloud instead of assuming planar driving
-                    z = pointcloud[i][2] + 1.73 # + sin(pitch)
+                        #         x = u / w
+                        #         y = v / w
+                        u = int(np.divide(pts[0], pts[2]))
+                        v = int(np.divide(pts[1], pts[2]))
+                        # TODO: recover groundplane from the point cloud instead of assuming planar driving
+                        z = pointcloud[i][2] + 1.73 # + sin(pitch)
 
-                    if u > 0 and u < width:
-                        if v > 0 and v < height:
-                            if z > 0.25:
-                                usedPoints += 1
-                                cv2.line(processedImg, (u, v), (u, 0), (0, 0, 255), thickness = 4, lineType = 8)
-        i +=1
-    print("\nnum used points: ")
+                        if u > 0 and u < width and object_line_for_clomumn[u] < v:
+                            object_line_for_clomumn[u] = v
+
+                        #if u > 0 and u < width:
+                        #    if v > 0 and v < height:
+                        #            usedPoints += 1
+                        #            cv2.line(processedImg, (u, v), (u, 0), (0, 0, 255), thickness = 4, lineType = 8)
+        i += 1
+
+    for u in range(0, len(object_line_for_clomumn)-1):
+        v = object_line_for_clomumn[u]
+        cv2.line(processedImg, (u, v + 1), (u, height), (255, 0, 0), thickness = 1, lineType = 8)
+    for u in range(0, len(object_line_for_clomumn)-1):
+        v = object_line_for_clomumn[u]
+        cv2.line(processedImg, (u, v), (u, 0), (0, 0, 255), thickness = 8, lineType = 8)
+
     print(usedPoints)
     return processedImg
 
@@ -73,16 +83,16 @@ consts.readTfLidarToCamera0(kitti_dir, sequence)
 i = 0
 j = 0
 # look ahead
-k = 20
+k = 100
 
 # should result in turn of 30 deg around X-Axis
 test_R = np.array([1, 0, 0, 0, np.sqrt(3) / 2, 0.5, 0, -0.5, np.sqrt(3) / 2]).reshape(3, 3)
 print(test_R)
 print(rotationMatrixToEulerAngles(test_R)*180 / 3.14159)
 test = np.eye(4)
-test[:3, :3] = test_R * np.array([0, 0, 1, -1, 0, 0, 0, -1, 0]).reshape(3, 3)
+test[:3, :3] = test_R #* np.array([0, 0, 1, -1, 0, 0, 0, -1, 0]).reshape(3, 3)
 print(test)
-alpha, beta, gamma = tf.euler_from_matrix(test, 'rzyx')
+alpha, beta, gamma = tf.euler_from_matrix(test, 'rzyz')
 print("\n zyx system \n")
 print(alpha * 180 / 3.1415, beta * 180 / 3.1415, gamma * 180 / 3.1415)
 
@@ -100,13 +110,14 @@ while i < len(consts.image_names) - 1:
     [yaw, pitch, roll] = rotationMatrixToEulerAngles(pose_chunk[:3, :3])
     print("\n xyz:")
     print(yaw * 180 / 3.1415, pitch * 180 / 3.1415, roll * 180 / 3.1415)
-    alpha, beta, gamma = tf.euler_from_matrix(pose_chunk, 'rzyx')
-    print("\n zyx system \n")
+
+    alpha, beta, gamma = tf.euler_from_matrix(pose_chunk, 'rxyz')
+    print("\n transformations \n")
     print(alpha * 180 / 3.1415, beta * 180 / 3.1415, gamma * 180 / 3.1415)
 
-    #points = load_velodyne_points(velo_dir + sequence, i)
-    #labeled_image = processPointCloud(image, points, pitch)
-    labeled_image = np.zeros(image.shape, dtype = np.uint8)
+    points = load_velodyne_points(velo_dir + sequence, i)
+    labeled_image = processPointCloud(image, points, pitch)
+    #labeled_image = np.zeros(image.shape, dtype = np.uint8)
 
     inv_image_pose = np.linalg.inv(pose_chunk)
     pose_chunk_t1 = np.eye(4, dtype = np.float)
@@ -129,9 +140,11 @@ while i < len(consts.image_names) - 1:
         # right multiply actual pose with inverse of the last
         pose_chunk = np.matmul(inv_image_pose, pose_chunk)
         # store inverted actual pose for the next step
-        inv_image_pose = np.linalg.inv(I)
+        #inv_image_pose = np.linalg.inv(I)
         # reshaping pt to 4x1
-        pt = np.array((pt[0], pt[1], pt[2], 1.0), dtype = np.float).reshape(4, 1)
+        #pt = np.array((pt[0], pt[1], pt[2], 1.0), dtype = np.float).reshape(4, 1)
+        pt = np.array((0.0, 0.0, 0.0, 1), dtype = np.float).reshape(4, 1)
+
         # concatenating forward pose transformation to point
         pt = np.matmul(pose_chunk, pt)
 

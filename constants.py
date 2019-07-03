@@ -29,8 +29,8 @@ class Constants():
         ## Translation from left & right wheel to camera
 
         # check if translation is correct that way
-        self.T_left = np.array([-0.8, 1.68, 1.65], dtype = np.float32).reshape(3, 1)
-        self.T_right = np.array([0.8, 1.68, 1.65], dtype = np.float32).reshape(3, 1)
+        self.T_left = np.array([-1.2, 1.68, 1.65], dtype = np.float32).reshape(3, 1)
+        self.T_right = np.array([1.2, 1.68, 1.65], dtype = np.float32).reshape(3, 1)
 
         ## Transformationmatrices from left & right wheel to camera
         self.RT_left = np.column_stack((self.R, self.T_left))
