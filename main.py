@@ -3,11 +3,13 @@ import numpy as np
 import os
 from constants import Constants
 from mathHelpers import add_ones, pt_in_image, rotationMatrixToEulerAngles
+import transformations as tf
 
-kitti_dir = '/home/nils/nils/kitti/data_odometry_gray/dataset/'
-#kitti_dir = '/media/localadmin/New Volume/11Nils/kitti/dataset/'
+#kitti_dir = '/home/nils/nils/kitti/data_odometry_gray/dataset/'
+kitti_dir = '/media/localadmin/New Volume/11Nils/kitti/dataset/'
 sequence = '00'
-velo_dir = '/home/nils/nils/kitti/dataset/sequences/'
+#velo_dir = '/home/nils/nils/kitti/dataset/sequences/'
+velo_dir = '/media/localadmin/New Volume/11Nils/kitti/dataset/sequences/'
 
 # https://github.com/hunse/kitti/blob/master/kitti/velodyne.py
 def load_velodyne_points(drive,  frame):
@@ -70,7 +72,21 @@ consts.readTfLidarToCamera0(kitti_dir, sequence)
 
 i = 0
 j = 0
+# look ahead
 k = 20
+
+# should result in turn of 30 deg around X-Axis
+test_R = np.array([1, 0, 0, 0, np.sqrt(3) / 2, 0.5, 0, -0.5, np.sqrt(3) / 2]).reshape(3, 3)
+print(test_R)
+print(rotationMatrixToEulerAngles(test_R)*180 / 3.14159)
+test = np.eye(4)
+test[:3, :3] = test_R * np.array([0, 0, 1, -1, 0, 0, 0, -1, 0]).reshape(3, 3)
+print(test)
+alpha, beta, gamma = tf.euler_from_matrix(test, 'rzyx')
+print("\n zyx system \n")
+print(alpha * 180 / 3.1415, beta * 180 / 3.1415, gamma * 180 / 3.1415)
+
+
 while i < len(consts.image_names) - 1:
     image = cv2.imread(consts.image_path + consts.image_names[i])
     j = i
@@ -79,8 +95,14 @@ while i < len(consts.image_names) - 1:
     pt_1 = np.array((0.0, 0.0, 0.0), dtype = np.float).reshape(3, 1)
     pose_chunk = np.eye(4, dtype = np.float)
     pose_chunk[:3, :4] = np.array(consts.poses[i]).reshape(3, 4)
+
+    # transform from rotation matrix to euler angles
     [yaw, pitch, roll] = rotationMatrixToEulerAngles(pose_chunk[:3, :3])
+    print("\n xyz:")
     print(yaw * 180 / 3.1415, pitch * 180 / 3.1415, roll * 180 / 3.1415)
+    alpha, beta, gamma = tf.euler_from_matrix(pose_chunk, 'rzyx')
+    print("\n zyx system \n")
+    print(alpha * 180 / 3.1415, beta * 180 / 3.1415, gamma * 180 / 3.1415)
 
     #points = load_velodyne_points(velo_dir + sequence, i)
     #labeled_image = processPointCloud(image, points, pitch)

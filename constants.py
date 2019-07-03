@@ -22,9 +22,13 @@ class Constants():
         self.K_inv = np.linalg.inv(self.K)
 
         #self.R = eulerAnglesToRotationMatrixRad(self.theta)
+
+        # R is represented as eye matrix since poses are given in ZYX-Representation
         self.R = np.eye(3, dtype = np.float)
 
         ## Translation from left & right wheel to camera
+
+        # check if translation is correct that way
         self.T_left = np.array([-0.8, 1.68, 1.65], dtype = np.float32).reshape(3, 1)
         self.T_right = np.array([0.8, 1.68, 1.65], dtype = np.float32).reshape(3, 1)
 
@@ -75,6 +79,6 @@ class Constants():
 
     def readTfLidarToCamera0(self, img_path, sequence):
         chunk = read_calib_file(img_path + "sequences/" + sequence + "/calib.txt")
-        self.Tr_lidar = chunk['Tr'].reshape(3,4)
+        self.Tr_lidar = chunk['Tr'].reshape(3, 4)
         self.P_L2C = np.matmul(self.K, self.Tr_lidar)
         print(self.P_L2C)
