@@ -7,7 +7,7 @@ import transformations as tf
 
 #kitti_dir = '/home/nils/nils/kitti/data_odometry_gray/dataset/'
 kitti_dir = '/media/localadmin/New Volume/11Nils/kitti/dataset/'
-sequence = '00'
+sequence = '02'
 #velo_dir = '/home/nils/nils/kitti/dataset/sequences/'
 velo_dir = '/media/localadmin/New Volume/11Nils/kitti/dataset/sequences/'
 
@@ -132,7 +132,7 @@ while i < len(consts.image_names) - 1:
     pt_l_last = [-1, -1]
     while j < i + k:
         # concatenate the posetransformations first before multiplying with pt and K
-        if j > len(consts.image_names):
+        if j > len(consts.image_names) - 1:
             break
         I = np.eye(4)
         pose_chunk[:3, :4] = np.array(consts.poses[j]).reshape(3, 4)
