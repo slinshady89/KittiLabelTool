@@ -174,22 +174,7 @@ while i < len(consts.image_names) - 1:
 
         j += 1
 
-    '''
-    u = v = 0
-    while u < width - 1:
-        while v < height - 1:
-            if (labeled_image[v, u, 1] == 0 and labeled_image[v, u, 2] == 0):
-                labeled_image[v, u] = (255, 0, 0)
-            v += 1
-        v = 0
-        u += 1
-    '''
     vis = cv2.addWeighted(image, 1.0, labeled_image, 1.0, 0.0)
     cv2.imshow("vis", vis)
     cv2.waitKey(100)
     i += 1
-
-
-#cv2.imshow("vis", vis)
-#cv2.waitKey(0)   # in ms
-
