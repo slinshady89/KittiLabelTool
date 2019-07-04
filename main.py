@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import os
 from constants import Constants
-from mathHelpers import add_ones, pt_in_image, rotationMatrixToEulerAngles
+from mathHelpers import pt_in_image, rotationMatrixToEulerAngles
 import transformations as tf
 
 #kitti_dir = '/home/nils/nils/kitti/data_odometry_gray/dataset/'
@@ -18,13 +18,12 @@ def load_velodyne_points(drive,  frame):
     points = points[:, :3]  # exclude luminance
     return points
 
-def processPointCloud(img, pointcloud, pitch):
+def processPointCloud(img, pointcloud, detections, div = 5):
     i = 0
     usedPoints = 0
     mean_z = 0
     height, width, channels = img.shape
     processedImg = np.zeros((height, width, 3), np.uint8)
-    object_line_for_column = np.zeros((width, 1), np.uint8)
     while i < len(pointcloud):
         # check if the x coordinate is in front of the camera at all
         if pointcloud[i][0] > 0:
@@ -43,17 +42,26 @@ def processPointCloud(img, pointcloud, pitch):
                         # TODO: recover groundplane from the point cloud instead of assuming planar driving
                         z = pointcloud[i][2] + 1.73 # + sin(pitch)
 
-                        if u > 0 and u < width and object_line_for_column[u] < v:
-                            object_line_for_column[u] = v
+                        if 0 < u < width - 1 and 0 < v < height:
+                            if np.abs(detections[u // div, 0] - v) < 5 or detections[u // div, 0] == 0:
+                                detections[u // div, 0] = v
+                                detections[u // div, 1] += 1
+                                detections[u // div, 2] = 1 - 0.4 ** detections[u // div, 1]
+                            else:
+                                detections[u // div, 0] = v
+                                detections[u // div, 1] = 1
+                                detections[u // div, 2] = 1 - 0.4 ** detections[u // div, 1]
+
 
         i += 1
-
-    for u in range(0, len(object_line_for_column)-1):
-        v = object_line_for_column[u]
-        cv2.line(processedImg, (u, v + 1), (u, height), (255, 0, 0), thickness = 1, lineType = 8)
-        cv2.line(processedImg, (u, v), (u, 0), (0, 0, 255), thickness = 8, lineType = 8)
-
-    print(usedPoints)
+    mean_prob = 0
+    for u in range(0, len(detections) - 1):
+        mean_prob += detections[u, 2]
+        v = int(detections[u, 0])
+        if detections[u, 2] > 0.59:
+            cv2.rectangle(processedImg, (u * div, v + 1), ((u + 1) * div, height), (255, 0, 0), 3)
+            cv2.rectangle(processedImg, (u * div, v), ((u + 1) * div, 0), (0, 0, 255), 3)
+    print(mean_prob / len(detections))
     return processedImg
 
 
@@ -90,6 +98,7 @@ alpha, beta, gamma = tf.euler_from_matrix(test, 'rzyz')
 print("\n zyx system \n")
 print(alpha * 180 / 3.1415, beta * 180 / 3.1415, gamma * 180 / 3.1415)
 
+detections = np.zeros((width // 5, 3), np.float)
 
 while i < len(consts.image_names) - 1:
     image = cv2.imread(consts.image_path + consts.image_names[i])
@@ -99,18 +108,24 @@ while i < len(consts.image_names) - 1:
     pose_chunk[:3, :4] = np.array(consts.poses[i]).reshape(3, 4)
 
     # transform from rotation matrix to euler angles
-    [yaw, pitch, roll] = rotationMatrixToEulerAngles(pose_chunk[:3, :3])
-    print("\n xyz:")
-    print(yaw * 180 / 3.1415, pitch * 180 / 3.1415, roll * 180 / 3.1415)
+    #[yaw, pitch, roll] = rotationMatrixToEulerAngles(pose_chunk[:3, :3])
+    #print("\n xyz:")
+    #print(yaw * 180 / 3.1415, pitch * 180 / 3.1415, roll * 180 / 3.1415)
 
-    alpha, beta, gamma = tf.euler_from_matrix(pose_chunk, 'rxyz')
-    print("\n transformations \n")
-    print(alpha * 180 / 3.1415, beta * 180 / 3.1415, gamma * 180 / 3.1415)
-
+    #alpha, beta, gamma = tf.euler_from_matrix(pose_chunk, 'rxyz')
+    #print("\n transformations \n")
+    #print(alpha * 180 / 3.1415, beta * 180 / 3.1415, gamma * 180 / 3.1415)
+    last_detections = detections
     points = load_velodyne_points(velo_dir + sequence, i)
-    labeled_image = processPointCloud(image, points, pitch)
+    labeled_image = processPointCloud(image, points, detections, 5)
     #labeled_image = np.zeros(image.shape, dtype = np.uint8)
-
+    '''
+    for k in range(0, len(detections)):
+        if detections[k, 1] == last_detections[k, 1]:
+            if detections[k, 1] > 0:
+                detections[k, 2] -= 0.4 ** detections[k, 1]
+                detections[k, 1] -= 1
+    '''
     inv_image_pose = np.linalg.inv(pose_chunk)
 
     pt_r_last = [-1, -1]
