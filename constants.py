@@ -1,7 +1,7 @@
 import numpy as np
 from pykitti.utils import read_calib_file
 
-from mathHelpers import quaternion_to_euler_rad
+from mathHelpers import quaternion_to_euler_rad, eulerAnglesToRotationMatrixRad
 import os
 
 class Constants():
@@ -9,6 +9,9 @@ class Constants():
 
         ## quaternion rotation of coordinate system from world to camera system
         self.quats =[-0.5, 0.5, -0.5, 0.5]
+        self.q = [0.500, -0.500, 0.500, -0.500]
+        self.thetaC2Veh = np.array(quaternion_to_euler_rad(self.q), dtype = np.float32).reshape(3, 1)
+        self.C2Veh = eulerAnglesToRotationMatrixRad(self.thetaC2Veh)
 
         self.theta = np.array(quaternion_to_euler_rad(self.quats), dtype = np.float32).reshape(3, 1)
 

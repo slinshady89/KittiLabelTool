@@ -5,11 +5,11 @@ from constants import Constants
 from mathHelpers import pt_in_image, rotationMatrixToEulerAngles
 import transformations as tf
 
-#kitti_dir = '/home/nils/nils/kitti/data_odometry_gray/dataset/'
-kitti_dir = '/media/localadmin/New Volume/11Nils/kitti/dataset/'
+kitti_dir = '/home/nils/nils/kitti/data_odometry_gray/dataset/'
+#kitti_dir = '/media/localadmin/New Volume/11Nils/kitti/dataset/'
 sequence = '02'
-#velo_dir = '/home/nils/nils/kitti/dataset/sequences/'
-velo_dir = '/media/localadmin/New Volume/11Nils/kitti/dataset/sequences/'
+velo_dir = '/home/nils/nils/kitti/dataset/sequences/'
+#velo_dir = '/media/localadmin/New Volume/11Nils/kitti/dataset/sequences/'
 
 # https://github.com/hunse/kitti/blob/master/kitti/velodyne.py
 def load_velodyne_points(drive,  frame):
@@ -127,6 +127,9 @@ while i < len(consts.image_names) - 1:
                 detections[k, 1] -= 1
     '''
     inv_image_pose = np.linalg.inv(pose_chunk)
+    test = np.matmul(consts.C2Veh, pose_chunk[:3, :3])
+    y, p, r = rotationMatrixToEulerAngles(pose_chunk[:3, :3])
+    print(y * 180 / 3.14159, p * 180 / 3.14159, r * 180 / 3.14159)
 
     pt_r_last = [-1, -1]
     pt_l_last = [-1, -1]
@@ -173,7 +176,6 @@ while i < len(consts.image_names) - 1:
                pt_r_last = pt_r
 
         j += 1
-
     vis = cv2.addWeighted(image, 1.0, labeled_image, 1.0, 0.0)
     cv2.imshow("vis", vis)
     cv2.waitKey(100)
