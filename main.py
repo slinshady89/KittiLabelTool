@@ -5,11 +5,11 @@ from constants import Constants
 from mathHelpers import pt_in_image, rotationMatrixToEulerAngles
 import transformations as tf
 
-kitti_dir = '/home/nils/nils/kitti/data_odometry_gray/dataset/'
-#kitti_dir = '/media/localadmin/New Volume/11Nils/kitti/dataset/'
+#kitti_dir = '/home/nils/nils/kitti/data_odometry_gray/dataset/'
+kitti_dir = '/media/localadmin/New Volume/11Nils/kitti/dataset/'
 sequence = '02'
-velo_dir = '/home/nils/nils/kitti/dataset/sequences/'
-#velo_dir = '/media/localadmin/New Volume/11Nils/kitti/dataset/sequences/'
+#velo_dir = '/home/nils/nils/kitti/dataset/sequences/'
+velo_dir = '/media/localadmin/New Volume/11Nils/kitti/dataset/sequences/'
 
 # https://github.com/hunse/kitti/blob/master/kitti/velodyne.py
 def load_velodyne_points(drive,  frame):
@@ -18,20 +18,23 @@ def load_velodyne_points(drive,  frame):
     points = points[:, :3]  # exclude luminance
     return points
 
-def processPointCloud(img, pointcloud, detections, div = 5):
+def processPointCloud(img, pointcloud, pitch, roll, detections, div = 5):
     i = 0
     usedPoints = 0
     mean_z = 0
     height, width, channels = img.shape
     processedImg = np.zeros((height, width, 3), np.uint8)
     while i < len(pointcloud):
+        x = pointcloud[i][0]
+        y = pointcloud[i][1]
+        z = pointcloud[i][2]
         # check if the x coordinate is in front of the camera at all
-        if pointcloud[i][0] > 0:
+        if x > 0:
             # check if it's roughly in front of the camera
-            if np.abs(pointcloud[i][1]) < 25:
-                if 0.25 < pointcloud[i][2] + 1.73:
-                    #test = np.array([pc_data[i][0], pc_data[i][1], pc_data[i][2], 1]).reshape(4,1)
-                    pts = np.matmul(consts.P_L2C, np.array([pointcloud[i][0], pointcloud[i][1], pointcloud[i][2],1]).reshape(4,1))
+            if -25 < y < 25:
+                # roughly check if it's higher than ground
+                if -1 < z + 1.73:
+                    pts = np.matmul(consts.P_L2C, np.array([x, y, z, 1]).reshape(4, 1))
                     #  [u v w]' = P * [X Y Z 1]'
                     if pts[2] != 0:
 
@@ -40,17 +43,19 @@ def processPointCloud(img, pointcloud, detections, div = 5):
                         u = int(np.divide(pts[0], pts[2]))
                         v = int(np.divide(pts[1], pts[2]))
                         # TODO: recover groundplane from the point cloud instead of assuming planar driving
-                        z = pointcloud[i][2] + 1.73 # + sin(pitch)
 
                         if 0 < u < width - 1 and 0 < v < height:
-                            if np.abs(detections[u // div, 0] - v) < 5 or detections[u // div, 0] == 0:
-                                detections[u // div, 0] = v
-                                detections[u // div, 1] += 1
-                                detections[u // div, 2] = 1 - 0.4 ** detections[u // div, 1]
-                            else:
-                                detections[u // div, 0] = v
-                                detections[u // div, 1] = 1
-                                detections[u // div, 2] = 1 - 0.4 ** detections[u // div, 1]
+                            if not x == 0 or y == 0:
+                                ground_depth = -1.73 - np.sin(pitch) / np.sqrt(x * x + y * y) - np.sin(roll) / y
+                                if z > ground_depth + 0.4:
+                                    if np.abs(detections[u // div, 0] - v) < 5 or detections[u // div, 0] == 0:
+                                        detections[u // div, 0] = v
+                                        detections[u // div, 1] += 1
+                                        detections[u // div, 2] = 1 - 0.4 ** detections[u // div, 1]
+                                    else:
+                                        detections[u // div, 0] = v
+                                        detections[u // div, 1] = 1
+                                        detections[u // div, 2] = 1 - 0.4 ** detections[u // div, 1]
 
 
         i += 1
@@ -58,11 +63,11 @@ def processPointCloud(img, pointcloud, detections, div = 5):
     for u in range(0, len(detections) - 1):
         mean_prob += detections[u, 2]
         v = int(detections[u, 0])
-        if detections[u, 2] > 0.59:
+        if detections[u, 2] > 0.5:
             cv2.rectangle(processedImg, (u * div, v + 1), ((u + 1) * div, height), (255, 0, 0), 3)
             cv2.rectangle(processedImg, (u * div, v), ((u + 1) * div, 0), (0, 0, 255), 3)
     print(mean_prob / len(detections))
-    return processedImg
+    return processedImg, detections
 
 
 
@@ -85,7 +90,7 @@ consts.readTfLidarToCamera0(kitti_dir, sequence)
 i = 0
 j = 0
 # look ahead
-k = 100
+k = 40
 
 # should result in turn of 30 deg around X-Axis
 test_R = np.array([1, 0, 0, 0, np.sqrt(3) / 2, 0.5, 0, -0.5, np.sqrt(3) / 2]).reshape(3, 3)
@@ -94,11 +99,12 @@ print(rotationMatrixToEulerAngles(test_R)*180 / 3.14159)
 test = np.eye(4)
 test[:3, :3] = test_R #* np.array([0, 0, 1, -1, 0, 0, 0, -1, 0]).reshape(3, 3)
 print(test)
-alpha, beta, gamma = tf.euler_from_matrix(test, 'rzyz')
+alpha, beta, gamma = tf.euler_from_matrix(test, 'rzyx')
 print("\n zyx system \n")
 print(alpha * 180 / 3.1415, beta * 180 / 3.1415, gamma * 180 / 3.1415)
 
 detections = np.zeros((width // 5, 3), np.float)
+q_C2Veh = [0.500, -0.500, 0.500, -0.500]
 
 while i < len(consts.image_names) - 1:
     image = cv2.imread(consts.image_path + consts.image_names[i])
@@ -107,29 +113,27 @@ while i < len(consts.image_names) - 1:
     pose_chunk = np.eye(4, dtype = np.float)
     pose_chunk[:3, :4] = np.array(consts.poses[i]).reshape(3, 4)
 
-    # transform from rotation matrix to euler angles
-    #[yaw, pitch, roll] = rotationMatrixToEulerAngles(pose_chunk[:3, :3])
-    #print("\n xyz:")
-    #print(yaw * 180 / 3.1415, pitch * 180 / 3.1415, roll * 180 / 3.1415)
+    quat = tf.quaternion_from_matrix(pose_chunk)
+    yaw, roll, pitch = tf.euler_from_quaternion(quat, 'ryzx') #ryzx or rxzy
+    print(yaw * 180 / 3.1415, roll * 180 / 3.1415, pitch * 180 / 3.1415)
 
-    #alpha, beta, gamma = tf.euler_from_matrix(pose_chunk, 'rxyz')
-    #print("\n transformations \n")
-    #print(alpha * 180 / 3.1415, beta * 180 / 3.1415, gamma * 180 / 3.1415)
     last_detections = detections
     points = load_velodyne_points(velo_dir + sequence, i)
-    labeled_image = processPointCloud(image, points, detections, 5)
+    labeled_image, detections = processPointCloud(image, points, pitch, roll, detections, 5)
     #labeled_image = np.zeros(image.shape, dtype = np.uint8)
-    '''
+
+    #'''
     for k in range(0, len(detections)):
         if detections[k, 1] == last_detections[k, 1]:
             if detections[k, 1] > 0:
                 detections[k, 2] -= 0.4 ** detections[k, 1]
                 detections[k, 1] -= 1
-    '''
+    #'''
+
     inv_image_pose = np.linalg.inv(pose_chunk)
-    test = np.matmul(consts.C2Veh, pose_chunk[:3, :3])
-    y, p, r = rotationMatrixToEulerAngles(pose_chunk[:3, :3])
-    print(y * 180 / 3.14159, p * 180 / 3.14159, r * 180 / 3.14159)
+    #test = np.matmul(consts.C2Veh, pose_chunk[:3, :3])
+    #y, p, r = rotationMatrixToEulerAngles(pose_chunk[:3, :3])
+    #print(y * 180 / 3.14159, p * 180 / 3.14159, r * 180 / 3.14159)
 
     pt_r_last = [-1, -1]
     pt_l_last = [-1, -1]
@@ -177,6 +181,7 @@ while i < len(consts.image_names) - 1:
 
         j += 1
     vis = cv2.addWeighted(image, 1.0, labeled_image, 1.0, 0.0)
+    cv2.imshow("gt", image)
     cv2.imshow("vis", vis)
     cv2.waitKey(100)
     i += 1
