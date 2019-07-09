@@ -5,11 +5,11 @@ from constants import Constants
 from mathHelpers import pt_in_image, rotationMatrixToEulerAngles
 import transformations as tf
 
-#kitti_dir = '/home/nils/nils/kitti/data_odometry_gray/dataset/'
-kitti_dir = '/media/localadmin/New Volume/11Nils/kitti/dataset/'
-sequence = '02'
-#velo_dir = '/home/nils/nils/kitti/dataset/sequences/'
-velo_dir = '/media/localadmin/New Volume/11Nils/kitti/dataset/sequences/'
+kitti_dir = '/home/nils/nils/kitti/data_odometry_gray/dataset/'
+#kitti_dir = '/media/localadmin/New Volume/11Nils/kitti/dataset/'
+sequence = '00'
+velo_dir = '/home/nils/nils/kitti/dataset/sequences/'
+#velo_dir = '/media/localadmin/New Volume/11Nils/kitti/dataset/sequences/'
 
 # https://github.com/hunse/kitti/blob/master/kitti/velodyne.py
 def load_velodyne_points(drive,  frame):
@@ -45,17 +45,23 @@ def processPointCloud(img, pointcloud, pitch, roll, detections, div = 5):
                         # TODO: recover groundplane from the point cloud instead of assuming planar driving
 
                         if 0 < u < width - 1 and 0 < v < height:
-                            if not x == 0 or y == 0:
-                                ground_depth = -1.73 - np.sin(pitch) / np.sqrt(x * x + y * y) - np.sin(roll) / y
-                                if z > ground_depth + 0.4:
-                                    if np.abs(detections[u // div, 0] - v) < 5 or detections[u // div, 0] == 0:
-                                        detections[u // div, 0] = v
-                                        detections[u // div, 1] += 1
-                                        detections[u // div, 2] = 1 - 0.4 ** detections[u // div, 1]
-                                    else:
-                                        detections[u // div, 0] = v
-                                        detections[u // div, 1] = 1
-                                        detections[u // div, 2] = 1 - 0.4 ** detections[u // div, 1]
+                            # height of the lidar relative to the street on a plane
+                            ground_depth = -1.73
+                            # if vehicle has pitch and roll angles these change the vehicle relative groundplane
+                            if not y == 0:
+                                ground_depth -= np.sin(pitch) / np.sqrt(x * x + y * y) + np.sin(roll) / y
+                            else:
+                                ground_depth -= np.sin(pitch) / np.sqrt(x * x + y * y)
+
+                            if z > ground_depth + 0.3:
+                                if np.abs(detections[u // div, 0] - v) < 5 or detections[u // div, 0] == 0:
+                                    detections[u // div, 0] = v
+                                    detections[u // div, 1] += 1
+                                    detections[u // div, 2] = 1 - 0.4 ** detections[u // div, 1]
+                                else:
+                                    detections[u // div, 0] = v
+                                    detections[u // div, 1] = 1
+                                    detections[u // div, 2] = 1 - 0.4 ** detections[u // div, 1]
 
 
         i += 1
@@ -128,6 +134,9 @@ while i < len(consts.image_names) - 1:
             if detections[k, 1] > 0:
                 detections[k, 2] -= 0.4 ** detections[k, 1]
                 detections[k, 1] -= 1
+            if detections[k, 1] == 0:
+                detections[k, 0] = 0
+                detections[k, 2] = 0.0
     #'''
 
     inv_image_pose = np.linalg.inv(pose_chunk)
