@@ -10,12 +10,10 @@ import transformations as tf
 #kitti_dir = '/home/nils/nils/kitti/data_odometry_gray/dataset/'
 kitti_dir = '/media/localadmin/New Volume/11Nils/kitti/dataset/'
 sequence = '00'
-#velo_dir = '/home/nils/nils/kitti/dataset/sequences/'
-velo_dir = '/media/localadmin/New Volume/11Nils/kitti/dataset/sequences/'
 
 # https://github.com/hunse/kitti/blob/master/kitti/velodyne.py
-def load_velodyne_points(drive,  frame):
-    points_path = os.path.join(drive + '/velodyne/', "%06d.bin" % frame)
+def load_velodyne_points(drive, sequence, frame):
+    points_path = os.path.join(drive + 'sequences/' + sequence + '/velodyne/', "%06d.bin" % frame)
     points = np.fromfile(points_path, dtype=np.float32).reshape(-1, 4)
     points = points[:, :3]  # exclude luminance
     return points
@@ -148,7 +146,7 @@ while i < len(consts.image_names) - 1:
     #print(yaw * 180 / 3.1415, roll * 180 / 3.1415, pitch * 180 / 3.1415)
 
     last_detections = detections
-    points = load_velodyne_points(velo_dir + sequence, i)
+    points = load_velodyne_points(kitti_dir, sequence, i)
     labeled_image, detections = processPointCloud(image, points, pitch, roll, detections, divisor)
     #labeled_image = np.zeros(image.shape, dtype = np.uint8)
 
