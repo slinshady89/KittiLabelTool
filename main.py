@@ -9,7 +9,7 @@ import transformations as tf
 
 #kitti_dir = '/home/nils/nils/kitti/data_odometry_gray/dataset/'
 kitti_dir = '/media/localadmin/New Volume/11Nils/kitti/dataset/'
-sequence = '00'
+sequence = '08'
 
 # https://github.com/hunse/kitti/blob/master/kitti/velodyne.py
 def load_velodyne_points(drive, sequence, frame):
@@ -55,8 +55,13 @@ def processPointCloud(img, pointcloud, pitch, roll, detections, div = 5):
                             ground_depth = -1.73 - np.sin(pitch) / np.sqrt(x * x + y * y) - y * np.arctan(roll)
 
                             if z > ground_depth + 0.3:
-                                if np.abs(detections[u // div, 0] - v) < 10 or detections[u // div, 0] == 0:
+                                if detections[u // div, 0] == 0:
                                     detections[u // div, 0] = v
+                                    detections[u // div, 1] += 1
+                                    detections[u // div, 2] = 1 - 0.4 ** detections[u // div, 1]
+
+                                if np.abs(detections[u // div, 0] - v) < 10:
+                                    #detections[u // div, 0] = v
                                     detections[u // div, 1] += 1
                                     detections[u // div, 2] = 1 - 0.4 ** detections[u // div, 1]
                                 else:
@@ -129,6 +134,7 @@ i = 0
 j = 0
 # look ahead
 k = 100
+
 
 divisor = 5
 
@@ -207,6 +213,9 @@ while i < len(consts.image_names) - 1:
                pt_l_last = pt_l
                pt_r_last = pt_r
         j += 1
+
+    label_path = os.path.join(kitti_dir + '/sequences/' + sequence + '/labels/', "%06d.png" % i)
+    cv2.imwrite(label_path, labeled_image)
 
     vis = cv2.addWeighted(image, 1.0, labeled_image, 1.0, 0.0)
     cv2.imshow("gt", image)

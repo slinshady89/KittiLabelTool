@@ -74,7 +74,7 @@ class Constants():
         for image_name in list_of_files:
             self.image_names.append(image_name)
         self.image_names.sort()
-        self.poses = np.loadtxt(img_path + "poses/" + sequence + ".txt")
+        self.poses = np.loadtxt(img_path + "ORB_poses/" + sequence + ".txt")
 
     def getImageName(self, idx):
         return self.image_path + self.image_names[idx]
