@@ -8,8 +8,8 @@ from mathHelpers import pt_in_image, rotationMatrixToEulerAngles
 import transformations as tf
 
 #kitti_dir = '/home/nils/nils/kitti/data_odometry_gray/dataset/'
-kitti_dir = '/media/localadmin/New Volume/11Nils/kitti/dataset/'
-sequence = '08'
+kitti_dir = '/media/localadmin/BigBerta/11Nils/kitti/dataset/'
+sequence = '00'
 
 # https://github.com/hunse/kitti/blob/master/kitti/velodyne.py
 def load_velodyne_points(drive, sequence, frame):
@@ -23,11 +23,8 @@ def processPointCloud(img, pointcloud, pitch, roll, detections, div = 5):
     usedPoints = 0
     mean_z = 0
 
-    height, width, channels = img.shape
-    processedImg = np.zeros((height, width, 3), np.uint8)
+    not_drivable_color = (0, 0, 0)
 
-    blue_rect = np.array([[0, 0], [0, height - 1], [width - 1, height - 1], [width - 1, 0]], np.int32).reshape((-1, 1, 2))
-    cv2.fillPoly(processedImg, [blue_rect], (255, 0, 0))
     while i < len(pointcloud):
         x = pointcloud[i][0]
         y = pointcloud[i][1]
@@ -55,6 +52,8 @@ def processPointCloud(img, pointcloud, pitch, roll, detections, div = 5):
                             ground_depth = -1.73 - np.sin(pitch) / np.sqrt(x * x + y * y) - y * np.arctan(roll)
 
                             if z > ground_depth + 0.3:
+                                if u // div >= len(detections):
+                                    u = div * (len(detections) - 1)
                                 if detections[u // div, 0] == 0:
                                     detections[u // div, 0] = v
                                     detections[u // div, 1] += 1
@@ -68,7 +67,6 @@ def processPointCloud(img, pointcloud, pitch, roll, detections, div = 5):
                                     detections[u // div, 0] = v
                                     detections[u // div, 1] = 1
                                     detections[u // div, 2] = 1 - 0.4 ** detections[u // div, 1]
-
 
         i += 1
     mean_prob = 0
@@ -92,8 +90,8 @@ def processPointCloud(img, pointcloud, pitch, roll, detections, div = 5):
                     break
             # draw from left side of the image until the first reflection
             if draw_left:
-                refl_rect = np.array([[0, 0], [left_refl[0], 0], left_refl, [0, left_refl[1]]], np.int32).reshape((-1, 1, 2))
-                cv2.fillPoly(processedImg, [refl_rect], (0, 0, 255))
+                refl_rect = np.array([[0, 0], [left_refl[0], 0], left_refl, [0, left_refl[1]]], np.int32)
+                cv2.fillPoly(img, [refl_rect], not_drivable_color)
                 draw_left = False
 
 
@@ -101,16 +99,17 @@ def processPointCloud(img, pointcloud, pitch, roll, detections, div = 5):
             top_left = [left_refl[0], 0]
             bottom_right = right_refl
             top_right = [right_refl[0], 0]
-            refl_rect = np.array([top_left, bottom_left, bottom_right, top_right], np.int32).reshape((-1, 1, 2))
-            cv2.fillPoly(processedImg, [refl_rect], (0, 0, 255))
+            refl_rect = np.array([top_left, bottom_left, bottom_right, top_right], np.int32)
+            cv2.fillPoly(img, [refl_rect], not_drivable_color)
 
     # fill the free space right of the most right reflection
-    refl_rect = np.array([bottom_right, top_right, [width - 1, 0], [width - 1, bottom_right[0]]], np.int32).reshape((-1, 1, 2))
-    cv2.fillPoly(processedImg, [refl_rect], (0, 0, 255))
+    refl_rect = np.array([bottom_right, top_right, [width - 1, 0], [width - 1, bottom_right[0]]], np.int32)
+    cv2.fillPoly(img, [refl_rect], not_drivable_color)
 
     # print mean probability of existence for all grid cells
     print(mean_prob / len(detections))
-    return processedImg, detections
+
+    return img, detections
 
 
 
@@ -135,6 +134,7 @@ j = 0
 # look ahead
 k = 100
 
+draw_path = False
 
 divisor = 5
 
@@ -151,9 +151,16 @@ while i < len(consts.image_names) - 1:
     yaw, roll, pitch = tf.euler_from_matrix(pose_chunk, 'ryzx') #ryzx or rxzy
     #print(yaw * 180 / 3.1415, roll * 180 / 3.1415, pitch * 180 / 3.1415)
 
+
+    h, w, c = image.shape
+    blue_img = np.zeros((h, w, 3), np.uint8)
+
+    blue_rect = np.array([[0, 0], [0, h - 1], [w - 1, h - 1], [w - 1, 0]], np.int32)
+    cv2.fillPoly(blue_img, [blue_rect], (255, 0, 0))
+
     last_detections = detections
     points = load_velodyne_points(kitti_dir, sequence, i)
-    labeled_image, detections = processPointCloud(image, points, pitch, roll, detections, divisor)
+    labeled_image, detections = processPointCloud(blue_img, points, pitch, roll, detections, divisor)
     #labeled_image = np.zeros(image.shape, dtype = np.uint8)
 
     # aging of detections
@@ -171,50 +178,51 @@ while i < len(consts.image_names) - 1:
 
     pt_r_last = [-1, -1]
     pt_l_last = [-1, -1]
-    while j < i + k:
-        # concatenate the posetransformations first before multiplying with pt and K
-        if j > len(consts.image_names) - 1:
-            break
-        I = np.eye(4)
-        pose_chunk[:3, :4] = np.array(consts.poses[j]).reshape(3, 4)
-        # store actual pose
-        I = pose_chunk
-        # right multiply actual pose with inverse of the image pose
-        pose_chunk = np.matmul(inv_image_pose, pose_chunk)
-        # reshaping pt to 4x1
-        pt = np.array((0.0, 0.0, 0.0, 1), dtype = np.float).reshape(4, 1)
+    if draw_path:
+        while j < i + k:
+            # concatenate the posetransformations first before multiplying with pt and K
+            if j > len(consts.image_names) - 1:
+                break
+            I = np.eye(4)
+            pose_chunk[:3, :4] = np.array(consts.poses[j]).reshape(3, 4)
+            # store actual pose
+            I = pose_chunk
+            # right multiply actual pose with inverse of the image pose
+            pose_chunk = np.matmul(inv_image_pose, pose_chunk)
+            # reshaping pt to 4x1
+            pt = np.array((0.0, 0.0, 0.0, 1), dtype = np.float).reshape(4, 1)
 
-        # concatenating forward pose transformation to point
-        pt = np.matmul(pose_chunk, pt)
+            # concatenating forward pose transformation to point
+            pt = np.matmul(pose_chunk, pt)
 
-        # projection into image coordinates
-        uvw_l = np.matmul(consts.KRT_left, pt)
-        uvw_r = np.matmul(consts.KRT_right, pt)
-        if uvw_l[2] != 0:
-            #         x = u / w
-            #         y = v / w
-            pt_l = (int(np.divide(uvw_l[0], uvw_l[2])), int(np.divide(uvw_l[1], uvw_l[2])))
-            pt_r = (int(np.divide(uvw_r[0], uvw_r[2])), int(np.divide(uvw_r[1], uvw_r[2])))
-            left_in = 0
-            right_in = 0
+            # projection into image coordinates
+            uvw_l = np.matmul(consts.KRT_left, pt)
+            uvw_r = np.matmul(consts.KRT_right, pt)
+            if uvw_l[2] != 0:
+                #         x = u / w
+                #         y = v / w
+                pt_l = (int(np.divide(uvw_l[0], uvw_l[2])), int(np.divide(uvw_l[1], uvw_l[2])))
+                pt_r = (int(np.divide(uvw_r[0], uvw_r[2])), int(np.divide(uvw_r[1], uvw_r[2])))
+                left_in = 0
+                right_in = 0
 
-            if pt_in_image(pt_l, width, height):
-                left_in = 1
-                #cv2.circle(labeled_image, pt_l, 1, (0, 255, 0), -1)
-            if pt_in_image(pt_r, width, height):
-                right_in = 1
-                #cv2.circle(labeled_image, pt_r, 1, (0, 255,0), -1)
+                if pt_in_image(pt_l, width, height):
+                    left_in = 1
+                    #cv2.circle(labeled_image, pt_l, 1, (0, 255, 0), -1)
+                if pt_in_image(pt_r, width, height):
+                    right_in = 1
+                    #cv2.circle(labeled_image, pt_r, 1, (0, 255,0), -1)
 
-            if pt_in_image(pt_l_last, width, height) and pt_in_image(pt_r_last, width, height):
-                if not pt_l_last == (-1, -1) or pt_r_last == (-1, -1):
-                    rect = np.array([pt_l, pt_r, pt_r_last, pt_l_last], np.int32).reshape((-1, 1, 2))
-                    cv2.fillPoly(labeled_image, [rect], (0, 255, 0))
-            if j > i:
-               pt_l_last = pt_l
-               pt_r_last = pt_r
-        j += 1
+                if pt_in_image(pt_l_last, width, height) and pt_in_image(pt_r_last, width, height):
+                    if not pt_l_last == (-1, -1) or pt_r_last == (-1, -1):
+                        rect = np.array([pt_l, pt_r, pt_r_last, pt_l_last], np.int32).reshape((-1, 1, 2))
+                        cv2.fillPoly(labeled_image, [rect], (0, 255, 0))
+                if j > i:
+                   pt_l_last = pt_l
+                   pt_r_last = pt_r
+            j += 1
 
-    label_path = os.path.join(kitti_dir + '/sequences/' + sequence + '/labels/', "%06d.png" % i)
+    label_path = os.path.join(kitti_dir + '/sequences/' + sequence + '/freespace/', "%06d.png" % i)
     cv2.imwrite(label_path, labeled_image)
 
     vis = cv2.addWeighted(image, 1.0, labeled_image, 1.0, 0.0)
