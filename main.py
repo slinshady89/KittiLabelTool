@@ -2,6 +2,7 @@
 import cv2
 import numpy as np
 import os
+import pypcd
 
 from constants import Constants
 from mathHelpers import pt_in_image, rotationMatrixToEulerAngles
@@ -18,12 +19,19 @@ def load_velodyne_points(drive, sequence, frame):
     points = points[:, :3]  # exclude luminance
     return points
 
+# https://github.com/hunse/kitti/blob/master/kitti/velodyne.py
+def load_velodyne_pcd(drive, sequence, frame):
+    points_path = os.path.join(drive + 'sequences/' + sequence + '/velo_no_floor/', "%06d.pcd" % frame)
+    pc = pypcd.PointCloud.from_path(points_path)
+    points = np.array([np.array(xi) for xi in pc.pc_data])
+    return points
+
 def processPointCloud(img, pointcloud, pitch, roll, detections, div = 5):
     i = 0
     usedPoints = 0
     mean_z = 0
 
-    not_drivable_color = (0, 0, 0)
+    not_drivable_color = (0, 0, 255)
 
     while i < len(pointcloud):
         x = pointcloud[i][0]
@@ -134,7 +142,7 @@ j = 0
 # look ahead
 k = 100
 
-draw_path = False
+draw_path = True
 
 divisor = 5
 
@@ -159,8 +167,7 @@ while i < len(consts.image_names) - 1:
     cv2.fillPoly(blue_img, [blue_rect], (255, 0, 0))
 
     last_detections = detections
-    points = load_velodyne_points(kitti_dir, sequence, i)
-    labeled_image, detections = processPointCloud(blue_img, points, pitch, roll, detections, divisor)
+    points = load_velodyne_points(kitti_dir, sequence, i+1)
     #labeled_image = np.zeros(image.shape, dtype = np.uint8)
 
     # aging of detections
@@ -216,16 +223,17 @@ while i < len(consts.image_names) - 1:
                 if pt_in_image(pt_l_last, width, height) and pt_in_image(pt_r_last, width, height):
                     if not pt_l_last == (-1, -1) or pt_r_last == (-1, -1):
                         rect = np.array([pt_l, pt_r, pt_r_last, pt_l_last], np.int32).reshape((-1, 1, 2))
-                        cv2.fillPoly(labeled_image, [rect], (0, 255, 0))
+                        cv2.fillPoly(blue_img, [rect], (0, 255, 0))
                 if j > i:
                    pt_l_last = pt_l
                    pt_r_last = pt_r
             j += 1
 
+    blue_img, detections = processPointCloud(blue_img, points, pitch, roll, detections, divisor)
     label_path = os.path.join(kitti_dir + '/sequences/' + sequence + '/freespace/', "%06d.png" % i)
-    cv2.imwrite(label_path, labeled_image)
+    cv2.imwrite(label_path, blue_img)
 
-    vis = cv2.addWeighted(image, 1.0, labeled_image, 1.0, 0.0)
+    vis = cv2.addWeighted(image, 1.0, blue_img, 1.0, 0.0)
     cv2.imshow("gt", image)
     cv2.imshow("vis", vis)
     cv2.waitKey(100)
