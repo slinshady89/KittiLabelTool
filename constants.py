@@ -37,9 +37,9 @@ class Constants():
 
         ## Transformationmatrices from left & right wheel to camera
         self.RT_left = np.column_stack((self.R, self.T_left))
-        print(self.RT_left)
+        #print(self.RT_left)
         self.RT_right = np.column_stack((self.R, self.T_right))
-        print(self.RT_right)
+        #print(self.RT_right)
 
         ## Projection matrices from left & right wheel to image coordinates
         self.KRT_left = np.matmul(self.K, self.RT_left)
