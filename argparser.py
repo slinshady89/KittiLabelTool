@@ -18,6 +18,11 @@ def argparser() :
     parser.add_argument("--label_dir",
                         default = '/labels/',
                         help = "folder to save labels in sequence")
+    parser.add_argument("--visu",
+                        default = 1,
+                        type = int,
+                        help = "0 if no visu"
+                                "1 if visu")
     args = parser.parse_args()
 
     return args

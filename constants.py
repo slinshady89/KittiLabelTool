@@ -46,14 +46,14 @@ class Constants():
         self.K_inv_RT_left = np.matmul(self.K_inv, self.RT_left)
         self.KRT_right = np.matmul(self.K, self.RT_right)
         self.K_inv_RT_right = np.matmul(self.K_inv, self.RT_right)
-
-
-        print("Projection Matrices: \n")
-        print("Left: \n")
-        print(self.KRT_left)
-        print("\nRight: \n")
-        print(self.KRT_right)
-        print("\n")
+        #
+        #
+        # print("Projection Matrices: \n")
+        # print("Left: \n")
+        # print(self.KRT_left)
+        # print("\nRight: \n")
+        # print(self.KRT_right)
+        # print("\n")
 
         ## projection matrix
         #     [fx'  0  cx' Tx]
@@ -69,7 +69,7 @@ class Constants():
         self.Tr_lidar = []
 
     def readFileLists(self, img_path, sequence):
-        self.image_path = img_path + "sequences/" + sequence + "/image_0/"
+        self.image_path = img_path + "sequences/" + sequence + "/image_2/"
         list_of_files = os.listdir(self.image_path)
         for image_name in list_of_files:
             self.image_names.append(image_name)
@@ -84,4 +84,4 @@ class Constants():
         chunk = read_calib_file(img_path + "sequences/" + sequence + "/calib.txt")
         self.Tr_lidar = chunk['Tr'].reshape(3, 4)
         self.P_L2C = np.matmul(self.K, self.Tr_lidar)
-        print(self.P_L2C)
+        # print(self.P_L2C)
