@@ -60,7 +60,7 @@ def print2img(img, text, position):
     return img
 
 
-def processPointCloud(img, pointcloud, pitch, roll, detections, div = 5, consts = Constants()):
+def processPointCloud(img, pointcloud, coeffs,  detections, div = 5, consts = Constants()):
     i = 0
     usedPoints = 0
     mean_z = 0
@@ -92,9 +92,10 @@ def processPointCloud(img, pointcloud, pitch, roll, detections, div = 5, consts 
                             # height of the lidar relative to the street on a plane
                             # if vehicle has pitch and roll angles these change the vehicle relative groundplane
                             # for very small lateral distances the roll influence is wrongly increased
-                            ground_depth = -1.73 - np.sin(pitch) / np.sqrt(x * x + y * y) - y * np.arctan(roll)
-
-                            if z > ground_depth + 0.3:
+                            # ground_depth = -1.73 - np.sin(pitch) / np.sqrt(x * x + y * y) - y * np.arctan(roll)
+                            norm = np.sqrt(coeffs[0] * coeffs[0] + coeffs[1] * coeffs[1] + coeffs[2] * coeffs[2])
+                            dist_to_ground_depth = (coeffs[0] * x + coeffs[1] * y + coeffs[2] * z + coeffs[3]) / norm
+                            if np.abs(dist_to_ground_depth) > 0.3:
                                 if u // div >= len(detections):
                                     u = div * (len(detections) - 1)
                                 if detections[u // div, 0] == 0:
@@ -181,19 +182,24 @@ def main(args):
     calc_path = True
     draw_path = True
 
+    initial_pose = np.eye(4, dtype = np.float)
+    initial_pose[:3, :4] = np.array(consts.poses[0]).reshape(3, 4)
+
     divisor = 5
 
     detections = np.zeros((width // divisor, 3), np.float)
     print("\nSequence %02d:\n" % int(args.sequence))
 
     while i < len(consts.image_names) - 1:
+
+        plane_coeffs = np.loadtxt(kitti_dir + 'sequences/00/norms/%06d.txt' % i, dtype = np.float)
         image = cv2.imread(consts.image_path + consts.image_names[i])
         j = i
         pt = np.array((0.0, 0.0, 0.0), dtype = np.float).reshape(3, 1)
         pose_chunk = np.eye(4, dtype = np.float)
         pose_chunk[:3, :4] = np.array(consts.poses[i]).reshape(3, 4)
-
-        yaw, pitch, roll = tf.euler_from_matrix(pose_chunk, 'ryzx') #ryzx or rxzy
+        movement = np.matmul(np.linalg.inv(initial_pose), pose_chunk)
+        yaw, pitch, roll = tf.euler_from_matrix(movement, 'ryzx') #ryzx or rxzy
         #print(yaw * 180 / 3.1415, roll * 180 / 3.1415, pitch * 180 / 3.1415)
 
 
@@ -201,7 +207,7 @@ def main(args):
         blue_img = np.zeros((h, w, 3), np.uint8)
 
         blue_rect = np.array([[0, 0], [0, h - 1], [w - 1, h - 1], [w - 1, 0]], np.int32)
-        # cv2.fillPoly(blue_img, [blue_rect], (255, 0, 0))
+        cv2.fillPoly(blue_img, [blue_rect], (255, 0, 0))
 
         last_detections = detections
         points = load_velodyne_points(args.base_path, args.sequence, i+1)
@@ -258,6 +264,7 @@ def main(args):
                 j += 1
 
         # blue_img, detections = processPointCloud(blue_img, points, pitch, roll, detections, divisor, consts)
+        blue_img, detections = processPointCloud(blue_img, points, plane_coeffs, detections, divisor, consts)
         img_name = os.path.join("%06d.png" % i)
         # print(label_path + img_name)
         # cv2.imwrite(label_path + img_name, blue_img)
@@ -269,10 +276,10 @@ def main(args):
         ypr = 'yaw: %.3f | pitch: %.3f | roll: %.3f' % (y, p, r)
 
         vis = cv2.addWeighted(image, 1.0, blue_img, 1.0, 0.0)
-        print2img(vis, ypr, (20, 20))
+        # print2img(vis, ypr, (20, 20))
 
         cv2.imshow('vis', vis)
-        cv2.waitKey(0)
+        cv2.waitKey(10)
 
         i += 1
 
